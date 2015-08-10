@@ -4,4 +4,6 @@ Includes SSE3/SSSE3 optimizations per [Screaming Fast galois Field Arithmetic](h
 
 Only tested in Visual Studio 2015. Shouldn't be too hard to port it to other places.
 
+The code is almost all in headers, as I find maintaining separate header/implementation pairs tedious beyond belief.
+
 MIT licensed, as per the Backblaze original.
