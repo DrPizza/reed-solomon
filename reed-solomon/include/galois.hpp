@@ -77,10 +77,6 @@ struct galois_t
 		int16_t b = 2;
 		for(uint16_t log = 0; log < FIELD_SIZE - 1; ++log)
 		{
-			if(result[b] != 0)
-			{
-				throw - 1;
-			}
 			result[b] = static_cast<uint8_t>(log);
 			b <<= 1;
 			if(FIELD_SIZE <= b)

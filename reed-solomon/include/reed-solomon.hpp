@@ -6,6 +6,7 @@
 #include "matrix.hpp"
 
 #include <memory>
+#include <stdexcept>
 
 #include <ppl.h>
 
@@ -19,11 +20,15 @@ struct reed_solomon
 {
 	static constexpr size_t alignment = 16;
 
-	reed_solomon(uint8_t dsc, uint8_t psc) : data_shard_count(dsc), parity_shard_count(psc), total_shard_count(dsc + psc), m(build_matrix(dsc, dsc + psc)), parity_rows(new const uint8_t*[psc])
+	reed_solomon(uint8_t dsc, uint8_t psc) : data_shard_count(dsc),
+	                                         parity_shard_count(psc),
+	                                         total_shard_count(dsc + psc),
+	                                         m(build_matrix(dsc, dsc + psc)),
+	                                         parity_rows(new const uint8_t*[psc])
 	{
-		if(data_shard_count + parity_shard_count > 255)
+		if(static_cast<size_t>(data_shard_count) + static_cast<size_t>(parity_shard_count) > 255)
 		{
-			throw - 9;
+			throw std::out_of_range("too many shards");
 		}
 
 		for(size_t i = 0; i < parity_shard_count; ++i)

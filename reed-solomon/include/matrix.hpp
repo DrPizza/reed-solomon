@@ -4,6 +4,8 @@
 
 #include "galois.hpp"
 
+#include <stdexcept>
+
 struct matrix
 {
 	matrix(size_t rows_, size_t columns_) : rows(rows_), columns(columns_), data(new uint8_t[rows_ * columns_]), row_pointers(new const uint8_t*[rows_])
@@ -44,7 +46,7 @@ struct matrix
 	{
 		if(r >= rows)
 		{
-			throw - 11;
+			throw std::out_of_range("no such row");
 		}
 		return row_pointers[r];
 	}
@@ -63,7 +65,7 @@ struct matrix
 	{
 		if(r >= rows || c >= columns)
 		{
-			throw - 3;
+			throw std::out_of_range("no such row or column");
 		}
 		return data[(r * columns) + c];
 	}
@@ -72,7 +74,7 @@ struct matrix
 	{
 		if(r >= rows || c >= columns)
 		{
-			throw - 4;
+			throw std::out_of_range("no such row or column");
 		}
 		data[(r * columns) + c] = value;
 	}
@@ -91,7 +93,7 @@ struct matrix
 	{
 		if(columns != rhs.rows)
 		{
-			throw - 5;
+			throw std::out_of_range("left.columns != right.rows");
 		}
 		matrix result{ rows, rhs.columns };
 		for(size_t r = 0; r < rows; ++r)
@@ -113,7 +115,7 @@ struct matrix
 	{
 		if(rows != rhs.rows)
 		{
-			throw - 6;
+			throw std::out_of_range("left.rows != right.rows");
 		}
 		matrix result{ rows, columns + rhs.columns };
 		for(size_t r = 0; r < rows; ++r)
@@ -147,7 +149,7 @@ struct matrix
 	{
 		if(r1 >= rows || r2 >= rows)
 		{
-			throw - 7;
+			throw std::out_of_range("no such row");
 		}
 		for(size_t i = 0; i < columns; ++i)
 		{
@@ -161,7 +163,7 @@ struct matrix
 	{
 		if(rows != columns)
 		{
-			throw - 8;
+			throw std::out_of_range("matrix not square");
 		}
 		matrix work = augment(identity(rows));
 		work.gaussian_elimination();
@@ -185,7 +187,7 @@ private:
 			}
 			if(get(r, r) == 0)
 			{
-				throw - 9;
+				throw std::runtime_error("matrix is singular");
 			}
 			if(get(r, r) != 1)
 			{
