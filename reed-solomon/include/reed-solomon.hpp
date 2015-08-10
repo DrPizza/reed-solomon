@@ -210,11 +210,11 @@ private:
 			{
 				outputs[i] ^= galois.MULTIPLICATION_TABLE[matrix_value][inputs[i]];
 			}
-			const __m128i low_table = _mm_loadu_si128(reinterpret_cast<const __m128i*>(galois.MULTIPLICATION_TABLE_LOW[matrix_value].data()));
+			const __m128i low_table  = _mm_loadu_si128(reinterpret_cast<const __m128i*>(galois.MULTIPLICATION_TABLE_LOW[matrix_value].data()));
 			const __m128i high_table = _mm_loadu_si128(reinterpret_cast<const __m128i*>(galois.MULTIPLICATION_TABLE_HIGH[matrix_value].data()));
-			const __m128i mask = _mm_set1_epi8(0x0f);
-			const __m128i* __restrict input_ptr = reinterpret_cast<const __m128i*>(&inputs[offset + head]);
-			__m128i* __restrict output_ptr = reinterpret_cast<      __m128i*>(&outputs[offset + head]);
+			const __m128i mask       = _mm_set1_epi8(0x0f);
+			const __m128i* __restrict input_ptr  = reinterpret_cast<const __m128i*>(&inputs [offset + head]);
+			      __m128i* __restrict output_ptr = reinterpret_cast<      __m128i*>(&outputs[offset + head]);
 			for(size_t i = offset + head; i < offset + head + body; i += 16, ++input_ptr, ++output_ptr)
 			{
 				__m128i input          = _mm_loadu_si128(input_ptr);

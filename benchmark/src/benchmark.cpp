@@ -11,11 +11,11 @@
 
 int main()
 {
-	static constexpr uint8_t DATA_COUNT = 16;
-	static constexpr uint8_t PARITY_COUNT = 4;
+	static constexpr uint8_t DATA_COUNT = 17;
+	static constexpr uint8_t PARITY_COUNT = 3;
 	static constexpr uint8_t TOTAL_COUNT = DATA_COUNT + PARITY_COUNT;
-	static constexpr size_t BUFFER_SIZE = 16 * 1024 * 1024;
-	static constexpr size_t NUMBER_OF_BUFFER_SETS = 1;
+	static constexpr size_t BUFFER_SIZE = 200 * 1024;
+	static constexpr size_t NUMBER_OF_BUFFER_SETS = 10;
 	static constexpr std::chrono::seconds MEASUREMENT_DURATION{ 10 };
 
 	struct buffer_set
