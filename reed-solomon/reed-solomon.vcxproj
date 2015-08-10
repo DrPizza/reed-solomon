@@ -178,9 +178,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="include\encoder.hpp" />
     <ClInclude Include="include\galois.hpp" />
     <ClInclude Include="include\matrix.hpp" />
