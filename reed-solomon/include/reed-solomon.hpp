@@ -8,7 +8,7 @@
 #include <memory>
 #include <stdexcept>
 
-#include <ppl.h>
+#include <tbb/tbb.h>
 
 #include <xmmintrin.h>
 #include <tmmintrin.h>
@@ -18,7 +18,7 @@
 
 struct reed_solomon
 {
-	static constexpr size_t alignment = 16;
+	static constexpr size_t alignment = 32;
 
 	reed_solomon(uint8_t dsc, uint8_t psc) : data_shard_count(dsc),
 	                                         parity_shard_count(psc),
@@ -251,17 +251,29 @@ private:
 			const __m128i mask       = _mm_set1_epi8(0x0f);
 			const __m128i* __restrict input_ptr  = reinterpret_cast<const __m128i*>(&inputs [offset + head]);
 			      __m128i* __restrict output_ptr = reinterpret_cast<      __m128i*>(&outputs[offset + head]);
-			for(size_t i = offset + head; i < offset + head + body; i += 16, ++input_ptr, ++output_ptr)
+			for(size_t i = offset + head; i < offset + head + body; i += 32)
 			{
-				__m128i input          = _mm_load_si128(input_ptr);
-				__m128i initial_output = _mm_load_si128(output_ptr);
-				__m128i low_indices    = _mm_and_si128(input, mask);
-				__m128i high_indices   = _mm_srli_epi8(input, 4);
-				__m128i low_parts      = _mm_shuffle_epi8(low_table, low_indices);
-				__m128i high_parts     = _mm_shuffle_epi8(high_table, high_indices);
-				__m128i output         = _mm_xor_si128(low_parts, high_parts);
-				        output         = _mm_xor_si128(initial_output, output);
-				                         _mm_store_si128(output_ptr, output);
+				__m128i input_0          = _mm_load_si128(const_cast<__m128i*>(input_ptr) + 0);
+				__m128i input_1          = _mm_load_si128(const_cast<__m128i*>(input_ptr) + 1);
+				__m128i initial_output_0 = _mm_load_si128(output_ptr + 0);
+				__m128i initial_output_1 = _mm_load_si128(output_ptr + 1);
+				__m128i low_indices_0    = _mm_and_si128(input_0, mask);
+				__m128i high_indices_0   = _mm_srli_epi8(input_0, 4);
+				__m128i low_parts_0      = _mm_shuffle_epi8(low_table, low_indices_0);
+				__m128i high_parts_0     = _mm_shuffle_epi8(high_table, high_indices_0);
+				__m128i output_0         = _mm_xor_si128(low_parts_0, high_parts_0);
+				        output_0         = _mm_xor_si128(initial_output_0, output_0);
+				__m128i low_indices_1    = _mm_and_si128(input_1, mask);
+				__m128i high_indices_1   = _mm_srli_epi8(input_1, 4);
+				__m128i low_parts_1      = _mm_shuffle_epi8(low_table, low_indices_1);
+				__m128i high_parts_1     = _mm_shuffle_epi8(high_table, high_indices_1);
+				__m128i output_1         = _mm_xor_si128(low_parts_1, high_parts_1);
+				        output_1         = _mm_xor_si128(initial_output_1, output_1);
+				                           _mm_store_si128(output_ptr + 0, output_0);
+				                           _mm_store_si128(output_ptr + 1, output_1);
+					
+				input_ptr  += 2;
+				output_ptr += 2;
 			}
 			for(size_t i = offset + head + body; i < offset + head + body + tail; ++i)
 			{
@@ -272,9 +284,9 @@ private:
 
 	void code_some_shards(const uint8_t* __restrict* __restrict matrix_rows, const uint8_t* __restrict* __restrict inputs, uint8_t input_count, uint8_t* __restrict* __restrict outputs, uint8_t output_count, size_t offset, size_t byte_count) const
 	{
-		static constexpr size_t chunk_size = 4096;
+		static const size_t chunk_size = 4096;
 		static const size_t chunks = byte_count / chunk_size;
-		concurrency::parallel_for(static_cast<size_t>(0), chunks, [&](size_t chunk)
+		tbb::parallel_for(static_cast<size_t>(0), chunks, [&](size_t chunk)
 		{
 			for(int output_shard = 0; output_shard < output_count; ++output_shard)
 			{
@@ -310,8 +322,8 @@ private:
 		static const size_t chunks = byte_count / chunk_size;
 		std::unique_ptr<unsigned char[]> buffer(new unsigned char[(offset * parity_count) + (parity_count * byte_count)]);
 	
-		concurrency::combinable<bool> ok;
-		concurrency::parallel_for(static_cast<size_t>(0), chunks, [&](size_t chunk)
+		tbb::combinable<bool> ok;
+		tbb::parallel_for(static_cast<size_t>(0), chunks, [&](size_t chunk)
 		{
 			ok.local() = true;
 			for(int output_shard = 0; output_shard < parity_count; ++output_shard)
