@@ -17,7 +17,8 @@
 [Rr]eleases/
 x64/
 x86/
-build/
+Win32/
+/build/
 bld/
 [Bb]in/
 [Oo]bj/
@@ -210,4 +211,3 @@ FakesAssemblies/
 GeneratedArtifacts/
 _Pvt_Extensions/
 ModelManifest.xml
-/Win32
