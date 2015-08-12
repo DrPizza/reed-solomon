@@ -11,8 +11,22 @@
 #include <vector>
 #include <random>
 
+struct high_priority_observer : tbb::task_scheduler_observer
+{
+	virtual void on_scheduler_entry(bool is_worker)
+	{
+		if(is_worker)
+		{
+			::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+		}
+	}
+};
+
 int main()
 {
+	high_priority_observer observer;
+	observer.observe(true);
+
 	static constexpr uint8_t DATA_COUNT = 16;
 	static constexpr uint8_t PARITY_COUNT = 4;
 	static constexpr uint8_t TOTAL_COUNT = DATA_COUNT + PARITY_COUNT;

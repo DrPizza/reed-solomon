@@ -18,7 +18,8 @@
 
 struct reed_solomon
 {
-	static constexpr size_t alignment = 32;
+	static constexpr size_t alignment = 64;
+	static constexpr size_t stepsize = 16;
 
 	reed_solomon(uint8_t dsc, uint8_t psc) : data_shard_count(dsc),
 	                                         parity_shard_count(psc),
@@ -139,6 +140,28 @@ struct reed_solomon
 	}
 
 private:
+	template <typename F, std::size_t... Indices, typename... Args>
+	static void __forceinline unroll_aux(F&& fun, std::index_sequence<Indices...>, Args&&... args)
+	{
+		using swallow = int[];
+		static_cast<void>(swallow{ 0, (std::forward<F>(fun)(std::forward<Args>(args)...), void(), Indices)... });
+	}
+
+	template <size_t N, typename F, typename... Args>
+	static void __forceinline unroll(F&& fun, Args&&... args)
+	{
+		unroll_aux(std::forward<F>(fun), std::make_index_sequence<N>{}, std::forward<Args>(args)...);
+	}
+
+	template <size_t N, typename F, typename... Args>
+	static void __forceinline partial_unroll(size_t start, size_t end, F&& fun, Args&&... args)
+	{
+		for(size_t i = start; i < end; i += N)
+		{
+			unroll_aux(std::forward<F>(fun), std::make_index_sequence<N>{}, std::forward<Args>(args)...);
+		}
+	}
+
 	// http://www.snia.org/sites/default/files2/SDC2013/presentations/NewThinking/EthanMiller_Screaming_Fast_Galois_Field%20Arithmetic_SIMD%20Instructions.pdf
 	void do_multiply(uint8_t matrix_value, const uint8_t* __restrict inputs, uint8_t* __restrict outputs, size_t offset, size_t byte_count) const
 	{
@@ -157,7 +180,7 @@ private:
 			const __m128i mask       = _mm_set1_epi8(0x0f);
 			const __m128i* __restrict input_ptr  = reinterpret_cast<const __m128i*>(&inputs [offset + head]);
 			      __m128i* __restrict output_ptr = reinterpret_cast<      __m128i*>(&outputs[offset + head]);
-			for(size_t i = offset + head; i < offset + head + body; i += 16, ++input_ptr, ++output_ptr)
+			partial_unroll<alignment / stepsize>((offset + head) / stepsize, (offset + head + body) / stepsize, [=]() mutable
 			{
 				__m128i input        = _mm_loadu_si128(input_ptr);
 				__m128i low_indices  = _mm_and_si128(input, mask);
@@ -166,7 +189,11 @@ private:
 				__m128i high_parts   = _mm_shuffle_epi8(high_table, high_indices);
 				__m128i output       = _mm_xor_si128(low_parts, high_parts);
 				                       _mm_store_si128(output_ptr, output);
-			}
+				++input_ptr;
+				++output_ptr;
+			});
+			input_ptr  += body / stepsize;
+			output_ptr += body / stepsize;
 			for(size_t i = offset + head + body; i < offset + head + body + tail; ++i)
 			{
 				outputs[i] = galois.MULTIPLICATION_TABLE[matrix_value][inputs[i]];
@@ -186,7 +213,7 @@ private:
 			const __m128i mask       = _mm_set1_epi8(0x0f);
 			const __m128i* __restrict input_ptr  = reinterpret_cast<const __m128i*>(&inputs [offset + head]);
 			      __m128i* __restrict output_ptr = reinterpret_cast<      __m128i*>(&outputs[offset + head]);
-			for(size_t i = offset + head; i < offset + head + body; i += 16, ++input_ptr, ++output_ptr)
+			partial_unroll<alignment / stepsize>((offset + head) / stepsize, (offset + head + body) / stepsize, [=]() mutable
 			{
 				__m128i input        = _mm_load_si128(input_ptr);
 				__m128i low_indices  = _mm_and_si128(input, mask);
@@ -195,7 +222,11 @@ private:
 				__m128i high_parts   = _mm_shuffle_epi8(high_table, high_indices);
 				__m128i output       = _mm_xor_si128(low_parts, high_parts);
 				                       _mm_store_si128(output_ptr, output);
-			}
+				++input_ptr;
+				++output_ptr;
+			});
+			input_ptr  += body / stepsize;
+			output_ptr += body / stepsize;
 			for(size_t i = offset + head + body; i < offset + head + body + tail; ++i)
 			{
 				outputs[i] = galois.MULTIPLICATION_TABLE[matrix_value][inputs[i]];
@@ -220,7 +251,7 @@ private:
 			const __m128i mask       = _mm_set1_epi8(0x0f);
 			const __m128i* __restrict input_ptr  = reinterpret_cast<const __m128i*>(&inputs [offset + head]);
 			      __m128i* __restrict output_ptr = reinterpret_cast<      __m128i*>(&outputs[offset + head]);
-			for(size_t i = offset + head; i < offset + head + body; i += 16, ++input_ptr, ++output_ptr)
+			partial_unroll<alignment / stepsize>((offset + head) / stepsize, (offset + head + body) / stepsize, [=]() mutable
 			{
 				__m128i input          = _mm_loadu_si128(input_ptr);
 				__m128i initial_output = _mm_load_si128(output_ptr);
@@ -231,7 +262,11 @@ private:
 				__m128i output         = _mm_xor_si128(low_parts, high_parts);
 				        output         = _mm_xor_si128(initial_output, output);
 				                         _mm_store_si128(output_ptr, output);
-			}
+				++input_ptr;
+				++output_ptr;
+			});
+			input_ptr  += body / stepsize;
+			output_ptr += body / stepsize;
 			for(size_t i = offset + head + body; i < offset + head + body + tail; ++i)
 			{
 				outputs[i] ^= galois.MULTIPLICATION_TABLE[matrix_value][inputs[i]];
@@ -251,12 +286,109 @@ private:
 			const __m128i mask       = _mm_set1_epi8(0x0f);
 			const __m128i* __restrict input_ptr  = reinterpret_cast<const __m128i*>(&inputs [offset + head]);
 			      __m128i* __restrict output_ptr = reinterpret_cast<      __m128i*>(&outputs[offset + head]);
-			for(size_t i = offset + head; i < offset + head + body; i += 32)
+#define TEMPLATE_UNROLL
+#if defined(NO_UNROLL)
+			for(size_t i = offset + head; i < offset + head + body; i += stepsize)
+			{
+				{
+					__m128i input          = _mm_load_si128(input_ptr);
+					__m128i initial_output = _mm_load_si128(output_ptr);
+					__m128i low_indices    = _mm_and_si128(input, mask);
+					__m128i high_indices   = _mm_srli_epi8(input, 4);
+					__m128i low_parts      = _mm_shuffle_epi8(low_table, low_indices);
+					__m128i high_parts     = _mm_shuffle_epi8(high_table, high_indices);
+					__m128i output         = _mm_xor_si128(low_parts, high_parts);
+					        output         = _mm_xor_si128(initial_output, output);
+					                         _mm_store_si128(output_ptr, output);
+					++input_ptr;
+					++output_ptr;
+				}
+			}
+#elif defined(MANUAL_UNROLL)
+			for(size_t i = offset + head; i < offset + head + body; i += alignment)
+			{
+				{
+					__m128i input          = _mm_load_si128(input_ptr);
+					__m128i initial_output = _mm_load_si128(output_ptr);
+					__m128i low_indices    = _mm_and_si128(input, mask);
+					__m128i high_indices   = _mm_srli_epi8(input, 4);
+					__m128i low_parts      = _mm_shuffle_epi8(low_table, low_indices);
+					__m128i high_parts     = _mm_shuffle_epi8(high_table, high_indices);
+					__m128i output         = _mm_xor_si128(low_parts, high_parts);
+					        output         = _mm_xor_si128(initial_output, output);
+					                         _mm_store_si128(output_ptr, output);
+					++input_ptr;
+					++output_ptr;
+				}
+				{
+					__m128i input          = _mm_load_si128(input_ptr);
+					__m128i initial_output = _mm_load_si128(output_ptr);
+					__m128i low_indices    = _mm_and_si128(input, mask);
+					__m128i high_indices   = _mm_srli_epi8(input, 4);
+					__m128i low_parts      = _mm_shuffle_epi8(low_table, low_indices);
+					__m128i high_parts     = _mm_shuffle_epi8(high_table, high_indices);
+					__m128i output         = _mm_xor_si128(low_parts, high_parts);
+					        output         = _mm_xor_si128(initial_output, output);
+					                         _mm_store_si128(output_ptr, output);
+					++input_ptr;
+					++output_ptr;
+				}
+				{
+					__m128i input          = _mm_load_si128(input_ptr);
+					__m128i initial_output = _mm_load_si128(output_ptr);
+					__m128i low_indices    = _mm_and_si128(input, mask);
+					__m128i high_indices   = _mm_srli_epi8(input, 4);
+					__m128i low_parts      = _mm_shuffle_epi8(low_table, low_indices);
+					__m128i high_parts     = _mm_shuffle_epi8(high_table, high_indices);
+					__m128i output         = _mm_xor_si128(low_parts, high_parts);
+					        output         = _mm_xor_si128(initial_output, output);
+					                         _mm_store_si128(output_ptr, output);
+					++input_ptr;
+					++output_ptr;
+				}
+				{
+					__m128i input          = _mm_load_si128(input_ptr);
+					__m128i initial_output = _mm_load_si128(output_ptr);
+					__m128i low_indices    = _mm_and_si128(input, mask);
+					__m128i high_indices   = _mm_srli_epi8(input, 4);
+					__m128i low_parts      = _mm_shuffle_epi8(low_table, low_indices);
+					__m128i high_parts     = _mm_shuffle_epi8(high_table, high_indices);
+					__m128i output         = _mm_xor_si128(low_parts, high_parts);
+					        output         = _mm_xor_si128(initial_output, output);
+					                         _mm_store_si128(output_ptr, output);
+					++input_ptr;
+					++output_ptr;
+				}
+			}
+#elif defined(TEMPLATE_UNROLL)
+			partial_unroll<alignment / stepsize>((offset + head) / stepsize, (offset + head + body) / stepsize, [=]() mutable
+			{
+				__m128i input          = _mm_load_si128(input_ptr);
+				__m128i initial_output = _mm_load_si128(output_ptr);
+				__m128i low_indices    = _mm_and_si128(input, mask);
+				__m128i high_indices   = _mm_srli_epi8(input, 4);
+				__m128i low_parts      = _mm_shuffle_epi8(low_table, low_indices);
+				__m128i high_parts     = _mm_shuffle_epi8(high_table, high_indices);
+				__m128i output         = _mm_xor_si128(low_parts, high_parts);
+				        output         = _mm_xor_si128(initial_output, output);
+				                         _mm_store_si128(output_ptr, output);
+				++input_ptr;
+				++output_ptr;
+			});
+			input_ptr  += body / stepsize;
+			output_ptr += body / stepsize;
+#elif defined(INTERLEAVED_UNROLL)
+			for(size_t i = offset + head; i < offset + head + body; i += alignment)
 			{
 				__m128i input_0          = _mm_load_si128(const_cast<__m128i*>(input_ptr) + 0);
 				__m128i input_1          = _mm_load_si128(const_cast<__m128i*>(input_ptr) + 1);
+				__m128i input_2          = _mm_load_si128(const_cast<__m128i*>(input_ptr) + 2);
+				__m128i input_3          = _mm_load_si128(const_cast<__m128i*>(input_ptr) + 3);
 				__m128i initial_output_0 = _mm_load_si128(output_ptr + 0);
 				__m128i initial_output_1 = _mm_load_si128(output_ptr + 1);
+				__m128i initial_output_2 = _mm_load_si128(output_ptr + 2);
+				__m128i initial_output_3 = _mm_load_si128(output_ptr + 3);
+
 				__m128i low_indices_0    = _mm_and_si128(input_0, mask);
 				__m128i high_indices_0   = _mm_srli_epi8(input_0, 4);
 				__m128i low_parts_0      = _mm_shuffle_epi8(low_table, low_indices_0);
@@ -271,10 +403,28 @@ private:
 				        output_1         = _mm_xor_si128(initial_output_1, output_1);
 				                           _mm_store_si128(output_ptr + 0, output_0);
 				                           _mm_store_si128(output_ptr + 1, output_1);
-					
-				input_ptr  += 2;
-				output_ptr += 2;
+
+				__m128i low_indices_2    = _mm_and_si128(input_2, mask);
+				__m128i high_indices_2   = _mm_srli_epi8(input_2, 4);
+				__m128i low_parts_2      = _mm_shuffle_epi8(low_table, low_indices_2);
+				__m128i high_parts_2     = _mm_shuffle_epi8(high_table, high_indices_2);
+				__m128i output_2         = _mm_xor_si128(low_parts_2, high_parts_2);
+				        output_2         = _mm_xor_si128(initial_output_2, output_2);
+				__m128i low_indices_3    = _mm_and_si128(input_3, mask);
+				__m128i high_indices_3   = _mm_srli_epi8(input_3, 4);
+				__m128i low_parts_3      = _mm_shuffle_epi8(low_table, low_indices_3);
+				__m128i high_parts_3     = _mm_shuffle_epi8(high_table, high_indices_3);
+				__m128i output_3         = _mm_xor_si128(low_parts_3, high_parts_3);
+				        output_3         = _mm_xor_si128(initial_output_3, output_3);
+				                           _mm_store_si128(output_ptr + 2, output_2);
+				                           _mm_store_si128(output_ptr + 3, output_3);
+
+				input_ptr  += alignment / stepsize;
+				output_ptr += alignment / stepsize;
 			}
+#else
+#error "You must define an unroll parameter!"
+#endif
 			for(size_t i = offset + head + body; i < offset + head + body + tail; ++i)
 			{
 				outputs[i] ^= galois.MULTIPLICATION_TABLE[matrix_value][inputs[i]];
