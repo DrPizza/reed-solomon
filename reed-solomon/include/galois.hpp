@@ -112,7 +112,6 @@ struct galois_t
 		return result;
 	}
 
-	// http://jerasure.org/jerasure/gf-complete/blob/master/src/gf_w8.c#L1194 scase 3
 	std::array<std::array<uint8_t, 16>, FIELD_SIZE> generate_multiplication_table_high()
 	{
 		std::array<std::array<uint8_t, 16>, FIELD_SIZE> result = { 0 };
@@ -129,7 +128,6 @@ struct galois_t
 		return result;
 	}
 
-	// http://jerasure.org/jerasure/gf-complete/blob/master/src/gf_w8.c#L1194 scase 3
 	std::array<std::array<uint8_t, 16>, FIELD_SIZE> generate_multiplication_table_low()
 	{
 		std::array<std::array<uint8_t, 16>, FIELD_SIZE> result = { 0 };

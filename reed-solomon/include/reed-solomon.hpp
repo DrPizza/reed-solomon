@@ -8,6 +8,8 @@
 #include <memory>
 #include <stdexcept>
 
+#define NOMINMAX
+
 #include <tbb/tbb.h>
 
 #include <xmmintrin.h>
@@ -380,10 +382,10 @@ private:
 #elif defined(INTERLEAVED_UNROLL)
 			for(size_t i = offset + head; i < offset + head + body; i += alignment)
 			{
-				__m128i input_0          = _mm_load_si128(const_cast<__m128i*>(input_ptr) + 0);
-				__m128i input_1          = _mm_load_si128(const_cast<__m128i*>(input_ptr) + 1);
-				__m128i input_2          = _mm_load_si128(const_cast<__m128i*>(input_ptr) + 2);
-				__m128i input_3          = _mm_load_si128(const_cast<__m128i*>(input_ptr) + 3);
+				__m128i input_0          = _mm_load_si128(input_ptr  + 0);
+				__m128i input_1          = _mm_load_si128(input_ptr  + 1);
+				__m128i input_2          = _mm_load_si128(input_ptr  + 2);
+				__m128i input_3          = _mm_load_si128(input_ptr  + 3);
 				__m128i initial_output_0 = _mm_load_si128(output_ptr + 0);
 				__m128i initial_output_1 = _mm_load_si128(output_ptr + 1);
 				__m128i initial_output_2 = _mm_load_si128(output_ptr + 2);
