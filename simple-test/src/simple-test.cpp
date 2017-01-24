@@ -11,7 +11,7 @@
 int main(int argc, char* argv[])
 {
 	const char* const filename = argc > 1 ? argv[1] : argv[0];
-	encoder e{ 4, 2 };
+	encoder e{ 17, 3 };
 
 	struct header_t
 	{
@@ -53,8 +53,9 @@ int main(int argc, char* argv[])
 			std::ifstream fin(std::string(filename) + "." + std::to_string(i), std::ifstream::binary);
 			fin.read(reinterpret_cast<char*>(buf.shards[i]), buf.shard_size);
 		}
-
-		std::cout << e.verify(buf) << std::endl;
+		std::cout << std::boolalpha;
+	
+		std::cout << "Does reading all parts verify? " << e.verify(buf) << std::endl;
 		std::unique_ptr<bool[]> present{ new bool[e.get_shard_count()] };
 		for(size_t i = 0; i < e.get_shard_count(); ++i)
 		{
@@ -63,15 +64,17 @@ int main(int argc, char* argv[])
 		// clobber a data shard
 		present[3] = false;
 		std::memset(buf.shards[3], 0, buf.shard_size);
-		std::cout << e.verify(buf) << std::endl;
+		std::cout << "Does clobbering a data shard verify? " << e.verify(buf) << std::endl;
 		e.repair(buf, present.get());
-		std::cout << e.verify(buf) << std::endl;
+		std::cout << "Does reading a repaired data shard verify? " << e.verify(buf) << std::endl;
 		// clobber a parity shard
+		present[3] = false;
 		present[5] = false;
+		std::memset(buf.shards[3], 0, buf.shard_size);
 		std::memset(buf.shards[5], 0, buf.shard_size);
-		std::cout << e.verify(buf) << std::endl;
+		std::cout << "Does clobbering a parity shard verify? " << e.verify(buf) << std::endl;
 		e.repair(buf, present.get());
-		std::cout << e.verify(buf) << std::endl;
+		std::cout << "Does reading a repaired parity shard verify? " << e.verify(buf) << std::endl;
 
 		std::ofstream fout(std::string(filename) + ".recovered", std::ofstream::binary | std::ofstream::trunc);
 		uint64_t bytes_remaining = *reinterpret_cast<const uint64_t*>(buf.shards[0]);

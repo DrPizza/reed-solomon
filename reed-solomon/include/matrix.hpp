@@ -5,6 +5,11 @@
 #include "galois.hpp"
 
 #include <stdexcept>
+#include <iostream>
+
+struct matrix;
+
+std::ostream& operator<<(std::ostream& os, const matrix& rhs);
 
 struct matrix
 {
@@ -147,79 +152,75 @@ struct matrix
 
 	void swap_rows(size_t r1, size_t r2)
 	{
-		if(r1 >= rows || r2 >= rows)
-		{
+		if(r1 >= rows || r2 >= rows) {
 			throw std::out_of_range("no such row");
 		}
-		for(size_t i = 0; i < columns; ++i)
-		{
+		for(size_t i = 0; i < columns; ++i) {
 			uint8_t tmp = get(r1, i);
 			set(r1, i, get(r2, i));
 			set(r2, i, tmp);
 		}
 	}
 
+	void multiply_row(size_t r, uint8_t m) {
+		if(r >= rows) {
+			throw std::out_of_range("no such row");
+		}
+		for(size_t c = 0; c < columns; ++c) {
+			set(r, c, galois.multiply(get(r, c), m));
+		}
+	}
+
+	// row dst <- dst + mul * scale
+	void row_linear_combination(size_t dst, size_t src, uint8_t scale) {
+		if(dst >= rows || src >= rows) {
+			throw std::out_of_range("no such row");
+		}
+		for(size_t c = 0; c < columns; ++c) {
+			uint8_t d = get(dst, c);
+			uint8_t s = get(src, c);
+			set(dst, c, d ^ galois.multiply(s, scale));
+		}
+	}
+
 	matrix invert() const
 	{
-		if(rows != columns)
-		{
+		if(rows != columns) {
 			throw std::out_of_range("matrix not square");
 		}
 		matrix work = augment(identity(rows));
+		// work = { M | I }
 		work.gaussian_elimination();
+		// work = { I | M^-1 }
 		return work.submatrix(0, rows, columns, columns * 2);
 	}
 
 private:
 	void gaussian_elimination()
 	{
-		for(size_t r = 0; r < rows; ++r)
-		{
-			if(get(r, r) == 0)
-			{
-				for(size_t row_below = r + 1; row_below < rows; ++row_below)
-				{
-					if(get(row_below, r) != 0)
-					{
-						swap_rows(r, row_below);
+		for(size_t pivot = 0; pivot < rows; ++pivot) {
+			if(get(pivot, pivot) == 0) {
+				for(size_t row_below = pivot + 1; row_below < rows; ++row_below) {
+					if(get(row_below, pivot) != 0) {
+						swap_rows(pivot, row_below);
 					}
 				}
 			}
-			if(get(r, r) == 0)
-			{
+			if(get(pivot, pivot) == 0) {
 				throw std::runtime_error("matrix is singular");
 			}
-			if(get(r, r) != 1)
-			{
-				uint8_t scale = galois.divide(1, get(r, r));
-				for(size_t c = 0; c < columns; ++c)
-				{
-					set(r, c, galois.multiply(get(r, c), scale));
-				}
+			// row pivot = row pivot * get(pivot, pivot)^-1
+			if(get(pivot, pivot) != 1) {
+				uint8_t scale = galois.divide(1, get(pivot, pivot));
+				multiply_row(pivot, scale);
 			}
-			for(size_t row_below = r + 1; row_below < rows; ++row_below)
-			{
-				if(get(row_below, r) != 0)
-				{
-					uint8_t scale = get(row_below, r);
-					for(size_t c = 0; c < columns; ++c)
-					{
-						set(row_below, c, get(row_below, c) ^ galois.multiply(scale, get(r, c)));
-					}
+			// if any other row has a non-zero element in this column, subtract this row from it until it's zero
+			for(size_t d = 0; d < rows; ++d) {
+				if(d == pivot) {
+					continue;
 				}
-			}
-		}
-		for(size_t d = 0; d < rows; ++d)
-		{
-			for(size_t row_above = 0; row_above < d; ++row_above)
-			{
-				if(get(row_above, d) != 0)
-				{
-					uint8_t scale = get(row_above, d);
-					for(size_t c = 0; c < columns; ++c)
-					{
-						set(row_above, c, get(row_above, c) ^ galois.multiply(scale, get(d, c)));
-					}
+				if(get(d, pivot) != 0) {
+					row_linear_combination(d, pivot, get(d, pivot));
 				}
 			}
 		}
@@ -239,3 +240,18 @@ private:
 	uint8_t* data;
 	const uint8_t** row_pointers;
 };
+
+std::ostream& operator<<(std::ostream& os, const matrix& rhs) {
+	os << "{\n";
+	for(size_t r = 0; r < rhs.get_rows(); ++r) {
+		os << "\t";
+		os << std::hex << static_cast<unsigned int>(rhs.get(r, 0));
+		
+		for(size_t c = 1; c < rhs.get_columns(); ++c) {
+			os << ", " << std::hex << static_cast<unsigned int>(rhs.get(r, c));
+		}
+		os << "\n";
+	}
+	os << "}\n";
+	return os << std::dec;
+}

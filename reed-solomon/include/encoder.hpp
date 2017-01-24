@@ -16,7 +16,7 @@ struct encoder
 		                                                                                             shard_size(shard_size_),
 		                                                                                             shard_count(shard_count_),
 		                                                                                             padding_size(padding_size_),
-		                                                                                             data{new unsigned char[buffer_size] },
+		                                                                                             data {new unsigned char[buffer_size] },
 		                                                                                             shards { new unsigned char*[shard_count] }
 		{
 			std::memset(data.get(), 0, buffer_size);

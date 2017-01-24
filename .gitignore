@@ -211,3 +211,6 @@ FakesAssemblies/
 GeneratedArtifacts/
 _Pvt_Extensions/
 ModelManifest.xml
+/reed-solomon.VC.db
+/reed-solomon.VC.VC.opendb
+/reed-solomon/runsdvui.cmd
